@@ -1,0 +1,35 @@
+# Reusable lint. Callers opt in per linter.
+name: lint
+on:
+  workflow_call:
+    inputs:
+      shellcheck:
+        type: boolean
+        default: true
+      terraform-fmt:
+        type: boolean
+        default: false
+      yamllint:
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: shellcheck
+        if: inputs.shellcheck
+        run: |
+          mapfile -t files < <(git ls-files '*.sh' 'bin/*' | xargs -r file | awk -F: '/shell script/{print $1}')
+          [ ${#files[@]} -eq 0 ] && { echo "no shell scripts"; exit 0; }
+          shellcheck -S warning "${files[@]}"
+      - uses: hashicorp/setup-terraform@v3
+        if: inputs.terraform-fmt
+      - name: terraform fmt
+        if: inputs.terraform-fmt
+        run: terraform fmt -check -recursive -diff
+      - name: yamllint
+        if: inputs.yamllint
+        run: pip install --quiet yamllint && yamllint -d relaxed .
